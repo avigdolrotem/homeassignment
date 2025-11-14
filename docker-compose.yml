@@ -130,15 +130,17 @@ services:
     depends_on:
       - ticdc
       - kafka
-    command: >
-      sh -c "sleep 45 && 
-             /cdc cli changefeed create 
-             --pd=http://pd:2379 
-             --sink-uri='kafka://kafka:29092/tidb-cdc?protocol=canal-json' 
-             --changefeed-id='tidb-kafka-changefeed' || true"
+      - pd
+    volumes:
+      - ./scripts/init-cdc.sh:/init-cdc.sh:ro
+    entrypoint: ["/bin/sh", "/init-cdc.sh"]
     networks:
       - tidb-network
-    restart: "no"
+    restart: "on-failure"
+    deploy:
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
 
 networks:
   tidb-network:
