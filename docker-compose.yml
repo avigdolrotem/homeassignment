@@ -125,6 +125,21 @@ services:
     networks:
       - tidb-network
 
+  ticdc-init:
+    image: pingcap/ticdc:latest
+    depends_on:
+      - ticdc
+      - kafka
+    command: >
+      sh -c "sleep 45 && 
+             /cdc cli changefeed create 
+             --pd=http://pd:2379 
+             --sink-uri='kafka://kafka:29092/tidb-cdc?protocol=canal-json' 
+             --changefeed-id='tidb-kafka-changefeed' || true"
+    networks:
+      - tidb-network
+    restart: "no"
+
 networks:
   tidb-network:
     driver: bridge
