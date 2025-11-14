@@ -1,0 +1,24 @@
+const log4js = require('log4js');
+
+log4js.configure({
+  appenders: {
+    console: { type: 'console' }
+  },
+  categories: {
+    default: { appenders: ['console'], level: 'info' }
+  }
+});
+
+const logger = log4js.getLogger();
+
+function logUserActivity(userId, action, ipAddress) {
+  const logEntry = {
+    timestamp: new Date().toISOString(),
+    userId: userId,
+    action: action,
+    ipAddress: ipAddress
+  };
+  logger.info(JSON.stringify(logEntry));
+}
+
+module.exports = { logUserActivity };

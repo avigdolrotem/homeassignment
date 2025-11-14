@@ -1,0 +1,130 @@
+services:
+  pd:
+    image: pingcap/pd:latest
+    ports:
+      - "2379:2379"
+    volumes:
+      - ./data/pd:/data
+    command:
+      - --name=pd
+      - --client-urls=http://0.0.0.0:2379
+      - --peer-urls=http://0.0.0.0:2380
+      - --advertise-client-urls=http://pd:2379
+      - --advertise-peer-urls=http://pd:2380
+      - --initial-cluster=pd=http://pd:2380
+      - --data-dir=/data/pd
+    networks:
+      - tidb-network
+
+  tikv:
+    image: pingcap/tikv:latest
+    volumes:
+      - ./data/tikv:/data
+    command:
+      - --addr=0.0.0.0:20160
+      - --advertise-addr=tikv:20160
+      - --data-dir=/data/tikv
+      - --pd=pd:2379
+    depends_on:
+      - pd
+    networks:
+      - tidb-network
+
+  tidb:
+    image: pingcap/tidb:latest
+    ports:
+      - "4000:4000"
+      - "10080:10080"
+    command:
+      - --store=tikv
+      - --path=pd:2379
+      - --advertise-address=tidb
+    depends_on:
+      - tikv
+    networks:
+      - tidb-network
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    hostname: zookeeper
+    container_name: home_assingment-zookeeper-1
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - tidb-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    hostname: kafka
+    container_name: home_assingment-kafka-1
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    networks:
+      - tidb-network
+
+  ticdc:
+    image: pingcap/ticdc:latest
+    depends_on:
+      - tidb
+      - kafka
+    ports:
+      - "8300:8300"
+    command:
+      - /cdc
+      - server
+      - --pd=http://pd:2379
+      - --log-file=/var/log/ticdc/ticdc.log
+      - --addr=0.0.0.0:8300
+      - --advertise-addr=ticdc:8300
+    networks:
+      - tidb-network
+
+  api:
+    build: ./api
+    ports:
+      - "3000:3000"
+    environment:
+      - DB_HOST=tidb
+      - DB_PORT=4000
+      - DB_USER=root
+      - DB_PASSWORD=
+      - DB_NAME=appdb
+    depends_on:
+      - tidb
+    networks:
+      - tidb-network
+
+  client:
+    build: ./client
+    ports:
+      - "8080:80"
+    depends_on:
+      - api
+    networks:
+      - tidb-network
+
+  cdc-consumer:
+    build: ./cdc-consumer
+    environment:
+      - KAFKA_BROKER=kafka:29092
+      - KAFKA_TOPIC=tidb-cdc
+    depends_on:
+      - kafka
+      - ticdc
+    networks:
+      - tidb-network
+
+networks:
+  tidb-network:
+    driver: bridge
