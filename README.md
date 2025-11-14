@@ -11,7 +11,7 @@ Full-stack application with TiDB distributed database, real-time CDC pipeline vi
 
 ```bash
 # Clone and start
-git clone <your-repo-url>
+git clone https://github.com/avigdolrotem/homeassignment/
 cd home_assingment
 docker-compose up -d
 
